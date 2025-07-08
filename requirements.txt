@@ -1,0 +1,15 @@
+speechrecognition
+flask
+werkzeug
+pillow
+tensorflow
+pytesseract
+numpy
+opencv-python
+ftfy 
+pyaudio
+googletrans==4.0.0-rc1
+pydub
+transformers
+torch
+sentencepiece

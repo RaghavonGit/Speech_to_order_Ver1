@@ -1,0 +1,79 @@
+{
+  "order_id": "ORDER_2565",
+  "language_detected": "tamil",
+  "raw_input": "கிராசே கானா வந்து ஒரு அஞ்சு பாக்கெட் முட்டை வந்து ஒரு ட்ரே கொடுத்திருங்க என்ன வந்து ஒரு லிட்டர் என்ன இப்போ அதுக்கப்புறம் வந்து கத்தரிக்காய் வெங்காயம் தக்காளி சோ இதெல்லாம் வந்து ஒரு 1kg கொடுக்குறீங்க",
+  "confidence": 0.8,
+  "items": [
+    {
+      "name": "Onion",
+      "quantity": "1",
+      "unit": "",
+      "confidence": 0.9,
+      "instructions": ""
+    },
+    {
+      "name": "Brinjal (Eggplant)",
+      "quantity": "1",
+      "unit": "",
+      "confidence": 0.9,
+      "instructions": ""
+    },
+    {
+      "name": "Tomato",
+      "quantity": "1",
+      "unit": "kg",
+      "confidence": 0.9,
+      "instructions": ""
+    },
+    {
+      "name": "Grasa Kana",
+      "quantity": "1",
+      "unit": "",
+      "confidence": 0.9,
+      "instructions": ""
+    },
+    {
+      "name": "Egg",
+      "quantity": "1",
+      "unit": "",
+      "confidence": 0.9,
+      "instructions": ""
+    },
+    {
+      "name": "Grasa Kana",
+      "quantity": "1",
+      "unit": "",
+      "confidence": 0.9,
+      "instructions": ""
+    },
+    {
+      "name": "Egg",
+      "quantity": "1",
+      "unit": "",
+      "confidence": 0.9,
+      "instructions": ""
+    },
+    {
+      "name": "Brinjal (Eggplant)",
+      "quantity": "1",
+      "unit": "",
+      "confidence": 0.9,
+      "instructions": ""
+    },
+    {
+      "name": "Onion",
+      "quantity": "1",
+      "unit": "",
+      "confidence": 0.9,
+      "instructions": ""
+    },
+    {
+      "name": "Tomato",
+      "quantity": "1",
+      "unit": "kg",
+      "confidence": 0.9,
+      "instructions": ""
+    }
+  ],
+  "translated_text": "Grace Ghana Come Come and Give a Try a Treray What Comes A liter"
+}
