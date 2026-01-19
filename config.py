@@ -98,6 +98,20 @@ class Config:
         'spices': ['turmeric', 'chili', 'cumin', 'coriander'],
         'groceries': ['oil', 'salt', 'sugar', 'tea', 'coffee']
     }
+    # CONVERSATIONAL COMMAND PATTERNS
+    COMMANDS = {
+    'cancel': [
+        r'cancel', r'remove', r'delete', r'வேண்டாம்', r'நீக்கு', 
+        r'vendaam', r'no wait', r'never mind', r'don\'t want', r'no no'
+    ],
+    'replace': [
+        r'instead', r'replace', r'change', r'பதிலாக', r'மாற்று', 
+        r'other than', r'badhulu', r'replace with'
+    ],
+    'update_qty': [
+        r'make it', r'change quantity', r'quantity', r'அளவு'
+    ]
+}
     
     # Unit conversions
     UNIT_CONVERSIONS = {

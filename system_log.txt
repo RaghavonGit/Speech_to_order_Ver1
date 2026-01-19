@@ -1,0 +1,33 @@
+2026-01-15 19:12:35,229 - [INFO] - Initializing Grocery Order System...
+2026-01-15 19:12:35,249 - [INFO] - Loading AI4Bharat Model on device: CUDA...
+2026-01-15 19:12:40,190 - [INFO] - System Initialization Complete.
+2026-01-15 19:12:40,202 - [WARNING] -  * Debugger is active!
+2026-01-15 19:12:40,207 - [INFO] -  * Debugger PIN: 144-853-856
+2026-01-15 19:12:40,245 - [INFO] - Processing Audio File: static\audio\audio_1768484560.wav
+2026-01-15 19:12:40,879 - [INFO] - Audio split into 9 chunks for processing.
+2026-01-15 19:12:48,018 - [INFO] - Processing Text as language: tamil
+2026-01-15 19:12:48,368 - [ERROR] - AI4Bharat Translation Error: 'NoneType' object has no attribute 'shape'
+2026-01-15 19:12:48,370 - [INFO] - Order successfully saved to: orders\order_ORDER_1768484568.json
+2026-01-15 19:12:48,372 - [INFO] - 127.0.0.1 - - [15/Jan/2026 19:12:48] "POST /process_audio HTTP/1.1" 200 -
+2026-01-15 19:16:37,852 - [INFO] - Initializing Grocery Order System...
+2026-01-15 19:16:37,922 - [INFO] - Loading AI4Bharat Model on device: CUDA...
+2026-01-15 19:16:43,581 - [INFO] - System Initialization Complete.
+2026-01-15 19:16:43,606 - [INFO] - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-01-15 19:16:43,607 - [INFO] - [33mPress CTRL+C to quit[0m
+2026-01-15 19:16:43,609 - [INFO] -  * Restarting with stat
+2026-01-15 19:16:50,028 - [INFO] - Initializing Grocery Order System...
+2026-01-15 19:16:50,052 - [INFO] - Loading AI4Bharat Model on device: CUDA...
+2026-01-15 19:16:55,641 - [INFO] - System Initialization Complete.
+2026-01-15 19:16:55,656 - [WARNING] -  * Debugger is active!
+2026-01-15 19:16:55,661 - [INFO] -  * Debugger PIN: 144-853-856
+2026-01-15 19:16:55,685 - [INFO] - 127.0.0.1 - - [15/Jan/2026 19:16:55] "GET / HTTP/1.1" 200 -
+2026-01-15 19:17:07,499 - [INFO] - Processing Audio File: static\audio\audio_1768484827.wav
+2026-01-15 19:17:08,082 - [INFO] - Audio split into 9 chunks for processing.
+2026-01-15 19:17:43,205 - [INFO] - Processing Text as language: tamil
+2026-01-15 19:17:43,869 - [ERROR] - AI4Bharat Translation Error: 'NoneType' object has no attribute 'shape'
+2026-01-15 19:17:43,870 - [INFO] - Order successfully saved to: orders\order_ORDER_1768484863.json
+2026-01-15 19:17:43,871 - [INFO] - 127.0.0.1 - - [15/Jan/2026 19:17:43] "POST /process_audio HTTP/1.1" 200 -
+2026-01-15 19:18:46,534 - [INFO] - 127.0.0.1 - - [15/Jan/2026 19:18:46] "[35m[1mGET /static/audio/audio_1768484827.wav HTTP/1.1[0m" 206 -
+2026-01-15 19:19:50,313 - [INFO] -  * Detected change in 'd:\\Projects_Raghav\\Syncorb_Voice_to _order\\speech_to_orders - Copy\\grocery_system.py', reloading
+2026-01-15 19:19:51,157 - [INFO] -  * Restarting with stat

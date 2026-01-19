@@ -4,6 +4,8 @@ Main Speech-to-Text Grocery Order System
 Supports multiple South Indian languages with modular architecture
 """
 
+import re
+import sys
 import speech_recognition as sr
 import json
 import logging
@@ -26,6 +28,7 @@ class GroceryItem:
     quantity: str
     unit: str
     confidence: float
+    instructions: List[str] = None 
 
 @dataclass
 class OrderResult:
@@ -37,9 +40,8 @@ class OrderResult:
 class SpeechToTextGrocerySystem:
     def __init__(self):
         self.recognizer = sr.Recognizer()
-        # self.microphone = sr.Microphone()
         
-        # Initialize language processors for extraction
+        # Initialize language processors
         self.processors = {
             'tamil': {
                 'veg': VegProcessor(),
@@ -47,7 +49,8 @@ class SpeechToTextGrocerySystem:
             },
             'telugu': TeluguProcessor()
         }
-        # Initialize language detectors for language detection only
+        
+        # Initialize language detectors
         self.language_detectors = {
             'tamil': TamilProcessor(),
             'telugu': TeluguProcessor()
@@ -56,190 +59,334 @@ class SpeechToTextGrocerySystem:
         # Configure logging
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
+        self.logger.info("System initialized.")
 
-        # Translation model and device setup
-        import torch
-        from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.logger.info(f"Using device: {self.device}")
-        self.logger.info("Loading translation model...")
-        self.translator_tokenizer = AutoTokenizer.from_pretrained(
-            "ai4bharat/indictrans2-indic-en-dist-200M", use_fast=False, trust_remote_code=True
-        )
-        self.translator_model = AutoModelForSeq2SeqLM.from_pretrained(
-            "ai4bharat/indictrans2-indic-en-dist-200M", trust_remote_code=True
-        ).to(self.device)
-        self.logger.info("Translation model loaded.")
-        
-        # Adjust for ambient noise
-        # with self.microphone as source:
-        #     self.recognizer.adjust_for_ambient_noise(source)
-    
+    def build_english_summary(self, items):
+        lines = []
+        for item in items:
+            qty = item.quantity
+            unit = item.unit or "units"
+            name = item.name
+            if getattr(item, "instructions", None):
+                instr = ", ".join(item.instructions)
+                lines.append(f"{qty} {unit} {name} ({instr})")
+            else:
+                lines.append(f"{qty} {unit} {name}")
+        return ", ".join(lines)
+
     def detect_language(self, text: str) -> str:
-        """
-        Detect the language of the input text
-        Returns the detected language key
-        """
         confidence_scores = {}
         for lang, detector in self.language_detectors.items():
             score = detector.detect_language_confidence(text)
             confidence_scores[lang] = score
-        # Return language with highest confidence
+        
         detected_lang = max(confidence_scores, key=lambda k: confidence_scores[k])
         self.logger.info(f"Language detected: {detected_lang} with confidence: {confidence_scores[detected_lang]}")
         return detected_lang
     
-    def detect_veg_nonveg(self, text: str) -> str:
-        """
-        Detect if the text is veg or non-veg using Tamil vocabularies.
-        Returns 'veg' or 'nonveg'. Defaults to 'veg' if unsure.
-        """
-        import os
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        vocab_path = os.path.join(base_dir, 'nonveg_vocab_ta.txt')
-        with open(vocab_path, encoding='utf-8') as f:
-            nonveg_vocab = set(line.strip() for line in f if line.strip())
-        text_lower = text.lower()
-        for word in nonveg_vocab:
-            if word in text_lower:
-                return 'nonveg'
-        return 'veg'
-    
-    def record_audio(self, timeout: int = 5, phrase_time_limit: int = 10) -> Optional[str]:
-        """
-        Record audio from microphone and convert to text
-        """
+    def _enter_pressed(self) -> bool:
         try:
-            self.logger.info("Listening for grocery order...")
-            
-            with self.microphone as source:
-                # Listen for audio with timeout
-                audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit)
-            
-            self.logger.info("Processing audio...")
-            
-            # Try Google Speech Recognition first (supports multiple languages)
-            try:
-                text = self.recognizer.recognize_google(audio, language='ta-IN')  # Default to Tamil
-                return text
-            except sr.UnknownValueError:
-                # Try with different language settings
-                for lang_code in ['te-IN', 'kn-IN', 'ml-IN', 'en-IN']:
-                    try:
-                        text = self.recognizer.recognize_google(audio, language=lang_code)
-                        return text
-                    except sr.UnknownValueError:
-                        continue
-                
-                self.logger.error("Could not understand audio")
-                return None
-                
-        except sr.WaitTimeoutError:
-            self.logger.error("Listening timeout")
-            return None
-        except Exception as e:
-            self.logger.error(f"Error recording audio: {e}")
-            return None
-    
-    def process_text_input(self, text: str) -> OrderResult:
-        """
-        Process text input and extract grocery items
-        """
-        if text is None:
-            return OrderResult(items=[], language_detected="unknown", raw_text="", confidence=0.0)
-        # Detect language
-        detected_lang = self.detect_language(text)
-        # For Tamil, auto-detect veg/non-veg and use the appropriate processor
-        if detected_lang == 'tamil':
-            category = self.detect_veg_nonveg(text)
-            processor = self.processors['tamil'][category]
-        else:
-            processor = self.processors[detected_lang]
-        # Extract grocery items
-        items = processor.extract_grocery_items(text)
-        # Convert dicts to GroceryItem objects if needed
-        grocery_items = []
-        for item in items:
-            if isinstance(item, dict):
-                grocery_items.append(GroceryItem(
-                    name=item.get("name", ""),
-                    quantity=item.get("quantity", ""),
-                    unit=item.get("unit", ""),
-                    confidence=item.get("confidence", 0.0)
-                ))
-            else:
-                grocery_items.append(item)
-        return OrderResult(
-            items=grocery_items,
-            language_detected=detected_lang,
-            raw_text=text,
-            confidence=0.8  # Default confidence
-        )
-    
-    def process_voice_order(self) -> Optional[OrderResult]:
-        """
-        Main method to process voice order
-        """
-        # Record audio
-        text = self.record_audio()
-        
-        if not text:
-            return None
-        
-        self.logger.info(f"Recognized text: {text}")
-        
-        # Process the text
-        return self.process_text_input(text)
-    
+            import msvcrt
+            if msvcrt.kbhit():
+                key = msvcrt.getch()
+                return key == b'\r'
+        except ImportError:
+            import sys
+            import select
+            if select.select([sys.stdin], [], [], 0)[0]:
+                sys.stdin.read(1)
+                return True
+        return False
+
+    def record_audio(self) -> Optional[str]:
+        collected_text = []
+        print("\nSpeak your grocery order.")
+        print("Press ENTER when finished.\n")
+
+        with sr.Microphone() as source:
+            self.recognizer.adjust_for_ambient_noise(source, duration=0.7)
+            self.recognizer.dynamic_energy_threshold = True
+            self.recognizer.pause_threshold = 0.8
+            self.recognizer.phrase_threshold = 0.3
+
+            while True:
+                try:
+                    print("Listening...", end="\r")
+                    audio = self.recognizer.listen(source, timeout=4, phrase_time_limit=7)
+
+                    for lang in ["ta-IN", "te-IN", "en-IN"]:
+                        try:
+                            text = self.recognizer.recognize_google(audio, language=lang)
+                            print(f"\nHeard ({lang}): {text}")
+                            collected_text.append(text)
+                            break
+                        except sr.UnknownValueError:
+                            continue
+                except sr.WaitTimeoutError:
+                    pass
+
+                if self._enter_pressed():
+                    break
+
+        final_text = " ".join(collected_text).strip()
+        return final_text if final_text else None
+
     def format_order_list(self, order_result: OrderResult) -> Dict:
-        """
-        Format the order result into a structured format
-        """
         formatted_order = {
-            "order_id": f"ORDER_{hash(order_result.raw_text) % 10000:04d}",
+            "order_id": f"ORDER_{abs(hash(order_result.raw_text)) % 10000:04d}",
             "language_detected": order_result.language_detected,
             "raw_input": order_result.raw_text,
             "confidence": order_result.confidence,
             "items": []
         }
-        # Translate raw_input to English using IndicTrans2
-        translated_text = ""
+        
         if order_result.language_detected == 'tamil':
-            print("[Main] Translating Tamil text to English...")
-            translated_text = self.translate_indic_to_english(order_result.raw_text)
-            print(f"[Main] Translated text: {translated_text}")
-        formatted_order["translated_text"] = translated_text
+            try:
+                summary = self.build_english_summary(order_result.items)
+                formatted_order["translated_text"] = summary
+            except Exception as e:
+                self.logger.error(f"Summary generation failed: {e}")
+                formatted_order["translated_text"] = ""
+        else:
+            formatted_order["translated_text"] = ""
+
         for item in order_result.items:
             formatted_order["items"].append({
                 "name": item.name,
                 "quantity": item.quantity,
                 "unit": item.unit,
                 "confidence": item.confidence,
-                "instructions": getattr(item, "instructions", "")
+                "instructions": getattr(item, "instructions", [])
             })
         return formatted_order
-    
+
+    def split_on_revisions(self, text: str) -> List[str]:
+        # Clean text: Remove dots but KEEP COMMAS for list separation
+        text = re.sub(r'[.!?…]+', ' ', text)
+        text = re.sub(r"\s+", " ", text)
+        
+        markers = [
+            "instead", "no no", "never mind", "cancel", "change", "remove", 
+            "actually", "sorry", "wait", "don't want", "replace",
+            "அதற்கு பதிலாக", "மாற்று", "நீக்கு",
+            "maathu", "mathu", "maathiru", "maathidunga", 
+            "badhila", "pathila", "badhulu", "vera", "veru",
+            "illa illa", "illa", "illai", 
+            "இல்ல இல்ல", "இல்ல", "இல்லை", "வேண்டாம்", "வேணாம்",
+            "podaadha", "podaatheenga", "podatheenga", 
+            "eduthuru", "eduthudunga", "eduthu", "thappa", "thappu",
+            "சேஞ்ச்", "மாத்திடுங்க", "மாத்து", "வேற", "பதிலா"
+        ]
+        
+        segments = []
+        buffer = ""
+        words = text.split()
+        i = 0
+        while i < len(words):
+            word = words[i]
+            marker_found = False
+            for marker in markers:
+                marker_words = marker.split()
+                if i + len(marker_words) <= len(words):
+                    current_slice = [w.lower() for w in words[i:i+len(marker_words)]]
+                    marker_slice = [mw.lower() for mw in marker_words]
+                    
+                    if current_slice == marker_slice:
+                        if buffer.strip():
+                            segments.append(buffer.strip())
+                            buffer = ""
+                        buffer = " ".join(words[i:i+len(marker_words)])
+                        i += len(marker_words)
+                        marker_found = True
+                        break
+            if not marker_found:
+                buffer += " " + word
+                i += 1
+                
+        if buffer.strip():
+            segments.append(buffer.strip())
+        return segments
+
+    def is_cancel_segment(self, segment: str) -> bool:
+        segment = segment.lower()
+        instruction_exceptions = [
+            "bone vendaam", "elumbu vendaam", "tholi vendaam", "skin vendaam",
+            "thalai vendaam", "head vendaam", "elumbu illa", "bone illa"
+        ]
+        for exc in instruction_exceptions:
+            if exc in segment:
+                temp_seg = segment.replace(exc, "")
+                if not any(k in temp_seg for k in ["vendaam", "cancel", "remove", "neekku", "illa", "venam"]):
+                    return False
+
+        cancel_keywords = [
+            "cancel", "remove", "delete", "don't want", "no need", "not that",
+            "no no", "never mind", 
+            "வேண்டாம்", "நீக்கு", "இல்லை", "இல்ல", "வேணாம்",
+            "venam", "vendaam", "vendam", "podaadha", "podaatheenga", 
+            "podatheenga", "eduthuru", "eduthudunga", "eduthu", "edunga", 
+            "thappa", "thappu"
+        ]
+        return any(keyword in segment for keyword in cancel_keywords)
+
+    def is_replace_segment(self, segment: str) -> bool:
+        segment = segment.lower()
+        replace_keywords = [
+            "instead", "replace", "change", "make it", "swap",
+            "அதற்கு பதிலாக", "மாற்று", "வேற", 
+            "badhila", "pathila", "badhulu", "maathu", "mathu", 
+            "maathiru", "maathidunga", "vera", "veru",
+            "சேஞ்ச்", "மாத்திடுங்க", "மாத்து", "பதிலா", "அதற்கு பதிலா"
+        ]
+        return any(keyword in segment for keyword in replace_keywords)
+
+    def segment_has_quantity(self, segment: str) -> bool:
+        quantity_patterns = [
+            r"\d+", r"அரை", r"கால்", r"முக்கால்", r"கிலோ", r"kg",
+            r"பாக்கெட்", r"packet", r"லிட்டர்", r"liter"
+        ]
+        return any(re.search(p, segment.lower()) for p in quantity_patterns)
+
+    def process_text_input(self, text: str) -> OrderResult:
+        order_items: List[GroceryItem] = []
+        last_item: Optional[GroceryItem] = None
+        last_action_was_cancel = False 
+
+        if not text:
+            return OrderResult([], "unknown", "", 0.0)
+
+        detected_lang = self.detect_language(text)
+        default_processor = self.processors["tamil"]["veg"] if detected_lang == "tamil" else self.processors.get(detected_lang)
+        revision_segments = self.split_on_revisions(text)
+
+        for rev_segment in revision_segments:
+            rev_segment = rev_segment.strip()
+            if not rev_segment: continue
+
+            target_name_to_block = None
+
+            # 1️⃣ CANCEL CHECK
+            if self.is_cancel_segment(rev_segment):
+                item_to_remove_index = -1
+                cancel_target_items = []
+                
+                procs = [self.processors["tamil"]["veg"], self.processors["tamil"]["nonveg"]] if detected_lang == "tamil" else [default_processor]
+                
+                for p in procs:
+                    if p:
+                        found = p.extract_grocery_items(rev_segment)
+                        if found: cancel_target_items.extend(found)
+                
+                if cancel_target_items:
+                    raw_target = cancel_target_items[0]
+                    target_name_to_block = raw_target.get("name") if isinstance(raw_target, dict) else raw_target.name
+                    if order_items:
+                        for idx in range(len(order_items) - 1, -1, -1):
+                            if order_items[idx].name == target_name_to_block:
+                                item_to_remove_index = idx
+                                break
+                elif order_items:
+                    item_to_remove_index = len(order_items) - 1
+                    target_name_to_block = order_items[item_to_remove_index].name
+
+                if item_to_remove_index != -1:
+                    removed = order_items.pop(item_to_remove_index)
+                    print(f"Removed item: {removed.name}")
+                    last_action_was_cancel = True
+                else:
+                    last_action_was_cancel = False
+
+            # 2️⃣ EXTRACT NEW ITEMS
+            processors_to_run = []
+            if detected_lang == "tamil":
+                processors_to_run.append(self.processors["tamil"]["veg"])
+                processors_to_run.append(self.processors["tamil"]["nonveg"])
+            elif default_processor:
+                processors_to_run.append(default_processor)
+
+            sub_segments = [rev_segment]
+            if processors_to_run and hasattr(processors_to_run[0], 'segment_text'):
+                sub_segments = processors_to_run[0].segment_text(rev_segment)
+
+            for item_segment in sub_segments:
+                for proc in processors_to_run:
+                    if hasattr(proc, 'normalize_numbers'):
+                        item_segment = proc.normalize_numbers(item_segment)
+
+                extracted_group = []
+                for proc in processors_to_run:
+                    found = proc.extract_grocery_items(item_segment)
+                    if found: extracted_group.extend(found)
+
+                # PRE-CHECK: Remove item if overlapping with Replacement intent
+                if self.is_replace_segment(rev_segment) and extracted_group:
+                    for raw_item in extracted_group:
+                        name = raw_item.get("name") if isinstance(raw_item, dict) else raw_item.name
+                        for i, existing in enumerate(order_items):
+                            if existing.name == name:
+                                order_items.pop(i)
+                                break
+
+                for raw_item in extracted_group:
+                    if isinstance(raw_item, dict):
+                        item = GroceryItem(
+                            name=raw_item.get("name", ""),
+                            quantity=raw_item.get("quantity", ""),
+                            unit=raw_item.get("unit", ""),
+                            confidence=raw_item.get("confidence", 0.0),
+                            instructions=raw_item.get("instructions", [])
+                        )
+                    else:
+                        item = raw_item
+
+                    if target_name_to_block and item.name == target_name_to_block:
+                        continue
+                    
+                    # REPLACE LOGIC
+                    if self.is_replace_segment(rev_segment) and order_items:
+                        if not last_action_was_cancel:
+                            prev = order_items.pop()
+                            if not self.segment_has_quantity(rev_segment):
+                                item.quantity = prev.quantity
+                                item.unit = prev.unit
+                        
+                        order_items.append(item)
+                        last_action_was_cancel = False
+                        continue
+
+                    # UPDATE LOGIC
+                    replaced = False
+                    for i, existing in enumerate(order_items):
+                        if existing.name == item.name:
+                            if item.quantity and item.quantity != "1": 
+                                existing.quantity = item.quantity
+                                existing.unit = item.unit
+                            if item.instructions:
+                                if existing.instructions is None: existing.instructions = []
+                                existing.instructions.extend(x for x in item.instructions if x not in existing.instructions)
+                            order_items[i] = existing
+                            replaced = True
+                            break
+                    
+                    # ADD LOGIC
+                    if not replaced:
+                        order_items.append(item)
+                        last_action_was_cancel = False
+
+        avg_confidence = (sum(i.confidence for i in order_items) / len(order_items) if order_items else 0.0)
+        return OrderResult(order_items, detected_lang, text, round(avg_confidence, 2))
+
     def save_order(self, order: Dict, filename: str = None) -> str:
-        """
-        Save order to JSON file
-        """
         if not filename:
             filename = f"order_{order['order_id']}.json"
-        
         filepath = Path("orders") / filename
         filepath.parent.mkdir(exist_ok=True)
-        
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(order, f, indent=2, ensure_ascii=False)
-        
         self.logger.info(f"Order saved to {filepath}")
         return str(filepath)
 
     def process_audio_file(self, file_path: str) -> Optional[OrderResult]:
-        """
-        Process an audio file and extract grocery items
-        """
-        # If the file is mp3, convert to wav first
         original_file_path = file_path
         temp_wav = None
         try:
@@ -249,75 +396,43 @@ class SpeechToTextGrocerySystem:
                 audio.export(temp_wav_file.name, format='wav')
                 temp_wav = temp_wav_file.name
                 file_path = temp_wav
+            
             with sr.AudioFile(file_path) as source:
                 audio = self.recognizer.record(source)
             self.logger.info(f"Processing audio file: {original_file_path}")
-            # Try Google Speech Recognition first (supports multiple languages)
-            try:
-                text = self.recognizer.recognize_google(audio, language='ta-IN')  # Default to Tamil
-            except sr.UnknownValueError:
-                # Try with different language settings
-                text = None
-                for lang_code in ['te-IN', 'kn-IN', 'ml-IN', 'en-IN']:
-                    try:
-                        text = self.recognizer.recognize_google(audio, language=lang_code)
-                        break
-                    except sr.UnknownValueError:
-                        continue
-                if text is None:
-                    self.logger.error("Could not understand audio in file")
-                    return None
+            
+            text = None
+            for lang_code in ['ta-IN', 'te-IN', 'en-IN']:
+                try:
+                    text = self.recognizer.recognize_google(audio, language=lang_code)
+                    break
+                except sr.UnknownValueError: continue
+            
             self.logger.info(f"Recognized text from file: {text}")
-            if text is None:
-                return None
+            if text is None: return None
             return self.process_text_input(text)
         except Exception as e:
             self.logger.error(f"Error processing audio file: {e}")
             return None
         finally:
-            if temp_wav:
-                import os
-                try:
-                    os.remove(temp_wav)
-                except Exception:
-                    pass
+            if temp_wav and os.path.exists(temp_wav):
+                try: os.remove(temp_wav)
+                except: pass
 
-    def translate_indic_to_english(self, text: str, src_lang: str = None) -> str:
-        """
-        Translate Indic language text to English using IndicTrans2 model.
-        Always uses 'tam_Taml' as the source language tag for now.
-        """
-        src_lang = 'tam_Taml'
-        self.logger.info(f"Attempting to translate: '{text}' from source language '{src_lang}'")
-        # print(f"Attempting to translate: '{text}' from source language '{src_lang}'")
-        try:
-            input_text = f"<{src_lang}> {text}"
-            # print(f"[DEBUG] input_text : {input_text}")
-            self.logger.info(f"Input to tokenizer: '{input_text}'")
-            inputs = self.translator_tokenizer(input_text, return_tensors="pt")
-            # Move tensors to the correct device
-            for k in inputs:
-                inputs[k] = inputs[k].to(self.device)
-            self.logger.info("Tokenization successful.")
-
-            generated_tokens = self.translator_model.generate(**inputs, max_length=256)
-            self.logger.info("Token generation successful.")
-
-            translated_text = self.translator_tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
-            self.logger.info(f"Decoded translation: '{translated_text}'")
-            print(f"[DEBUG] Translated text (from translate_indic_to_english): {translated_text}")
-            return translated_text
-        except Exception as e:
-            self.logger.error(f"Error during translation: {e}", exc_info=True)
-            return ""
+    def process_voice_order(self) -> Optional[OrderResult]:
+        self.logger.info("Starting voice order capture")
+        text = self.record_audio()
+        if not text:
+            self.logger.error("No speech detected")
+            return None
+        self.logger.info(f"Final recognized speech: {text}")
+        return self.process_text_input(text)
 
 def main():
-    """
-    Main function to demonstrate the system
-    """
     system = SpeechToTextGrocerySystem()
-    import os
     sample_files_dir = os.path.join(os.path.dirname(__file__), 'Sample Files')
+    if not os.path.exists(sample_files_dir):
+        os.makedirs(sample_files_dir, exist_ok=True)
 
     print("South Indian Languages Grocery Order System")
     print("Supported languages: Tamil, Telugu")
@@ -328,63 +443,37 @@ def main():
 
     choice = input("Enter choice (1, 2 or 3): ").strip()
 
+    result = None
     if choice == "1":
-        print("\nSpeak your grocery order now...")
         result = system.process_voice_order()
     elif choice == "2":
-        text = input("\nEnter your grocery order in any supported language: ")
+        text = input("\nEnter your grocery order: ")
         result = system.process_text_input(text)
     elif choice == "3":
-        # List available audio files
-        print("\nAvailable audio files in Sample Files:")
         try:
-            files = [f for f in os.listdir(sample_files_dir) if f.lower().endswith(('.wav', '.flac', '.mp3', '.aiff', '.aifc'))]
-        except Exception as e:
-            print(f"Error accessing Sample Files folder: {e}")
-            return
+            files = [f for f in os.listdir(sample_files_dir) if f.lower().endswith(('.wav', '.flac', '.mp3'))]
+        except Exception: files = []
+        
         if not files:
-            print("No audio files found in Sample Files folder.")
+            print("No audio files found in 'Sample Files' folder.")
             return
         for idx, fname in enumerate(files, 1):
             print(f"{idx}. {fname}")
-        file_choice = input("Enter the number of the audio file to process: ").strip()
         try:
-            file_idx = int(file_choice) - 1
-            if file_idx < 0 or file_idx >= len(files):
-                print("Invalid file selection.")
-                return
-            file_path = os.path.join(sample_files_dir, files[file_idx])
-        except Exception:
-            print("Invalid input.")
-            return
-        result = system.process_audio_file(file_path)
-    else:
-        print("Invalid choice")
-        return
+            idx = int(input("Select file number: ")) - 1
+            if 0 <= idx < len(files):
+                result = system.process_audio_file(os.path.join(sample_files_dir, files[idx]))
+        except ValueError:
+            print("Invalid input")
     
     if result:
-        # Format and display the order
         formatted_order = system.format_order_list(result)
-        
         print(f"\n--- ORDER PROCESSED ---")
-        print(f"Language Detected: {formatted_order['language_detected'].title()}")
-        print(f"Order ID: {formatted_order['order_id']}")
-        print(f"Raw Input: {formatted_order['raw_input']}")
-        print(f"Confidence: {formatted_order['confidence']:.2f}")
-        print(f"\n--- GROCERY ITEMS ---")
-        
-        if formatted_order['items']:
-            for i, item in enumerate(formatted_order['items'], 1):
-                print(f"{i}. {item['name']} - {item['quantity']} {item['unit']} (confidence: {item['confidence']:.2f})")
-        else:
-            print("No grocery items detected")
-        
-        # Save order
-        filepath = system.save_order(formatted_order)
-        print(f"\nOrder saved to: {filepath}")
-        
-    else:
-        print("Failed to process order")
+        print(f"Language: {formatted_order['language_detected']}")
+        print(f"Items Found: {len(formatted_order['items'])}")
+        for item in formatted_order['items']:
+            print(f"- {item['name']}: {item['quantity']} {item['unit']} ({item['confidence']})")
+        system.save_order(formatted_order)
 
 if __name__ == "__main__":
-    main() 
+    main()

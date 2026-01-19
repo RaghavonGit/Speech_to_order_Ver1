@@ -2,7 +2,6 @@ speechrecognition
 flask
 werkzeug
 pillow
-tensorflow
 pytesseract
 numpy
 opencv-python

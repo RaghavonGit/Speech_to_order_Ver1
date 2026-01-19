@@ -5,7 +5,7 @@ Handles Tamil language grocery orders
 """
 
 from base_processor import BaseLanguageProcessor, GroceryItem
-from typing import Dict, List
+from typing import Dict, List, Optional
 import re
 
 class TamilProcessor(BaseLanguageProcessor):
@@ -239,7 +239,7 @@ class TamilProcessor(BaseLanguageProcessor):
         
         return text
     
-    def find_grocery_item_in_text(self, text: str) -> str:
+    def find_grocery_item_in_text(self, text: str) -> Optional[str]:
         """
         Tamil-specific grocery item finding with fuzzy matching
         """

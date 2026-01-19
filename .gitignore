@@ -48,3 +48,15 @@ Thumbs.db
 *.mov
 *.wmv
 
+__pycache__/
+*.pyc
+.env
+env/
+venv/
+.idea/
+.vscode/
+orders/
+static/audio/
+*.wav
+*.mp3
+*.m4a

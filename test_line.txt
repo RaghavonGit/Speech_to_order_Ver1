@@ -1,0 +1,60 @@
+1.  
+"thakkali 1 kilo, onion 2 kilo, urulaikizhangu 2.5 kilo, carrot half kilo, sapotta 1 packet, 
+apple 4 pieces, banana 1 bunch" 
+2.  
+"murungakkai 4 pieces, vendaikkai 1 kilo, small onion 250 grams, tomato 1.25 kilo, guava 
+3, vazhaipazham 6, seethapazham 2" 
+3.  
+"big onion 1 kilo, urulaikizhangu 1.5 kilo, thakkali 1 kilo, carrot 500 grams, sapotta half 
+kilo, apple 3, pear 2" 
+4.  
+"sambar vengayam 1 packet, murungai ilai 100 grams, beans 750 grams, beetroot 1 kilo, 
+banana one bunch, apple 2 pieces, seethapazham 3" 
+5.  
+"vendakkai 1.25 kilo, thakkali 1 kilo, urulaikizhangu 2 kilo, onion 1.5 kilo, sapotta 1 
+packet, guava 2 pieces, orange 4" 
+6.  
+"murungakkai 5 pieces, beetroot 500 grams, carrot 1 kilo, vazhaipazham one bunch, 
+thakkali 1 kilo, apple 3 pieces, pear 1" 
+7.  
+"onion 2 kilo, tomato 1 kilo, urulaikizhangu 2 kilo, seethapazham 3, sapotta 1 packet, 
+banana 1 bunch, apple 2" 
+8.  
+"thakkali 1 kilo, carrot 750 grams, beetroot half kilo, murungakkai 3 pieces, small onion 
+300 grams, sapotta 1 kilo, guava 4" 
+9.  
+"vendaikkai 1 kilo, urulaikizhangu 2.5 kilo, tomato 1 kilo, apple 4 pieces, banana 1 bunch, 
+pear 2, seethapazham 1" 
+10.  
+"onion 1 kilo, murungakkai 4, carrot 1 kilo, beetroot 750 grams, sapotta half kilo, orange 
+5, guava 3" 
+11.  
+"thakkali 1.25 kilo, urulaikizhangu 2 kilo, sambar vengayam 1 packet, banana 6, apple 3, 
+sapotta 1 packet, pear 2" 
+12.  
+"carrot 1 kilo, beans 750 grams, beetroot half kilo, tomato 1 kilo, onion 1.5 kilo, guava 2 
+pieces, banana 1 bunch" 
+13.  
+"murungakkai 3, vendaikkai 1 kilo, thakkali 1 kilo, small onion 250 grams, sapotta 1 
+packet, seethapazham 2, apple 4" 
+14.  
+"onion 1.5 kilo, urulaikizhangu 2 kilo, thakkali 1 kilo, beetroot 1 kilo, carrot 500 grams, 
+guava 2, orange 4" 
+15.  
+"sambar onion 1 packet, murungai ilai 100 grams, thakkali 1 kilo, banana 1 bunch, 
+sapotta 1 kilo, seethapazham 2, apple 3 pieces" 
+16.  
+"urulaikizhangu 2 kilo, beetroot 500 grams, carrot 750 grams, onion 1 kilo, tomato 1.5 
+kilo, sapotta half kilo, pear 3" 
+17.  
+"thakkali 1 kilo, murungakkai 5, vendaikkai 1 kilo, banana 1 bunch, apple 2 pieces, 
+sapotta 1 packet, seethapazham 3" 
+18.  
+"onion 1 kilo, carrot 1 kilo, beetroot 1 kilo, urulaikizhangu 1.5 kilo, sapotta 1 packet, apple 
+4 pieces, orange 2" 
+19.  
+"small onion 1 packet, thakkali 1 kilo, beans 750 grams, murungakkai 4, banana 1 bunch, 
+sapotta 500 grams, guava 3" 
+20.  
+"vendaikkai 1 kilo, urulaikizhangu 2 kilo, carrot 1 kilo, onion 1 kilo, thakkali 1.25 kilo, 
+apple 2, sapotta 1 packet, pear 2" 
