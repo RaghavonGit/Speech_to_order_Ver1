@@ -11,16 +11,17 @@ import time
 import logging
 import tempfile
 import torch
-import speech_recognition as sr
 from typing import Dict, List, Optional
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from transformers import PreTrainedTokenizer
 from typing import Optional
+import speech_recognition as sr
+from pydub import AudioSegment
+
+
 
 # Audio Processing
-from pydub import AudioSegment, effects
-from pydub.silence import split_on_silence
 
 # AI Translation
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -59,14 +60,14 @@ class OrderResult:
 class SpeechToTextGrocerySystem:
     def __init__(self):
         self.recognizer = sr.Recognizer()
+        self.recognizer.energy_threshold = 300
+        self.recognizer.dynamic_energy_threshold = True
+        self.recognizer.pause_threshold = 0.6
+        self.recognizer.phrase_threshold = 0.3
         self.translator_tokenizer: Optional[PreTrainedTokenizer] = None
         # 1. Initialize Extraction Processors
         self.processors = {
             'tamil': {'veg': VegProcessor(), 'nonveg': NonVegProcessor()},
-            'telugu': TeluguProcessor()
-        }
-        self.language_detectors = {
-            'tamil': TamilProcessor(),
             'telugu': TeluguProcessor()
         }
 
@@ -88,80 +89,62 @@ class SpeechToTextGrocerySystem:
             logger.info("✅ Translation Model Loaded.")
         except Exception as e:
             logger.error(f"❌ Failed to load Translation Model: {e}")
+            return None
 
     # =========================================================================
     # AUDIO PIPELINE
     # =========================================================================
     
-    def preprocess_audio(self, audio_segment: AudioSegment) -> AudioSegment:
-        """Normalize audio volume and format for Speech Recognition"""
-        normalized = effects.normalize(audio_segment)
-        normalized = normalized.set_channels(1)
-        normalized = normalized.set_frame_rate(16000)
-        return normalized
+    def _prepare_audio(self,input_path:str)->str:
+        sound= AudioSegment.from_file(input_path)
+        sound=sound.set_channels(1)
+        sound=sound.set_frame_rate(16000)
+        base,_=os.path.splitext(input_path)
+        tmp_path=base+"_proc.wav"
+        sound.export(tmp_path,format='wav')
+        return tmp_path
 
     def process_audio_file(self, file_path: str) -> Optional[OrderResult]:
         logger.info(f"Processing audio: {file_path}")
+
         if not os.path.exists(file_path):
             logger.error("File not found.")
             return None
 
-        temp_dir = tempfile.mkdtemp()
-        full_transcript = []
-
         try:
-            # 1. Load & Clean
-            raw_audio = AudioSegment.from_file(file_path)
-            audio = self.preprocess_audio(raw_audio)
-            
-            # 2. Smart Chunking (Fixes Google Timeout on Long Files)
-            chunks = split_on_silence(
-                audio, min_silence_len=700, silence_thresh=audio.dBFS - 14, keep_silence=500
-            )
-            if not chunks: chunks = [audio]
-            if not chunks or all(len(c)<1000 for c in chunks):
-                logger.error("No valid audio chunks found.")
-                return None
+            wav_path = self._prepare_audio(file_path)
 
-            # 3. Transcribe Chunks
-            for i, chunk in enumerate(chunks):
-                chunk_path = os.path.join(temp_dir, f"chunk_{i}.wav")
-                chunk.export(chunk_path, format="wav")
-                
-                with sr.AudioFile(chunk_path) as source:
-                    self.recognizer.adjust_for_ambient_noise(source, duration=0.5)
-                    audio_data = self.recognizer.record(source)
-                    
-                    # Try Tamil first, then English
-                    text_chunk = None
-                    try:
-                        text_chunk = self.recognizer.recognize_google(audio_data, language='ta-IN')
-                    except sr.UnknownValueError:
-                        try:
-                            text_chunk = self.recognizer.recognize_google(audio_data, language='en-IN')
-                        except sr.UnknownValueError:
-                            text_chunk = None
-                    
-                    if not text_chunk:
-                        logger.warning("Stt recognition failed for chunk.")
-                        try:
-                            text_chunk = self.recognizer.recognize_google(audio_data, language='en-IN')
-                        except:
-                            text_chunk=None
+            with sr.AudioFile(wav_path) as source:
+                audio = self.recognizer.record(source)
 
-            final_text = " ".join(full_transcript).strip()
-            logger.info(f"Final Transcript: {final_text}")
-            
-            if not final_text: return None
-            return self.process_text_input(final_text)
+            text = None
+
+        # 1️⃣ Try Tamil first
+            try:
+                text = self.recognizer.recognize_google(audio, language="ta-IN")
+            except sr.UnknownValueError:
+                pass
+
+            # 2️⃣ Fallback to English (code-mix support)
+            if not text:
+                try:
+                    text = self.recognizer.recognize_google(audio, language="en-IN")
+                except sr.UnknownValueError:
+                    pass
+            if not text:
+                logger.warning("No speech recognized.")
+                return OrderResult([], "unknown", "", 0.0)
+
+            text = re.sub(r"\s+", " ", text).strip()
+            logger.info(f"STT Text: {text}")
+
+            return self.process_text_input(text)
 
         except Exception as e:
             logger.error(f"Audio Processing Error: {e}")
             return None
-        finally:
-            import shutil
-            shutil.rmtree(temp_dir, ignore_errors=True)
 
+        
     # =========================================================================
     # TRANSLATION PIPELINE (FIXED)
     # =========================================================================
@@ -228,13 +211,13 @@ class SpeechToTextGrocerySystem:
         clean_text = text.lower()
         if detected_lang == 'tamil':
             # Only use Tamil specific normalization if Tamil is detected
+            clean_text = self.processors['tamil']['veg'].normalize_numbers(clean_text)  
             clean_text = self.processors['tamil']['nonveg'].normalize_numbers(clean_text)
         
         # 3. Select processors
         # We use Tamil processors for both because they contain the full English+Tamil vocab maps
         active_processors = [self.processors['tamil']['veg'], self.processors['tamil']['nonveg']]
-        if detected_lang == 'tamil' or 'chicken' in clean_text or 'mutton' in clean_text:
-            active_processors.append(self.processors['tamil']['nonveg'])
+
 
         # 4. Segment text (Split "onion and tomato" into ["onion", "tomato"])
         segments = [clean_text]
@@ -247,8 +230,7 @@ class SpeechToTextGrocerySystem:
         for segment in segments:
             if not segment.strip():
                 continue
-            
-            
+             
             # Run all processors on this segment
             veg_items=self.processors['tamil']['veg'].extract_grocery_items(segment)
             if veg_items:
@@ -259,7 +241,14 @@ class SpeechToTextGrocerySystem:
 
         # 6. Convert to GroceryItem Objects and Deduplicate
         final_items = []
-        
+        # --- FIX: Ensure Egg always treated as non-veg with tray unit ---
+        for item in all_extracted_items:
+            if not isinstance(item, dict):
+                continue
+            name = item.get("name") or item.get("local_name")
+            if name and name.lower() == "egg":
+                item["unit"] = "tray"
+
         for raw_item in all_extracted_items:
             # Handle Dictionary format (from VegProcessor)
             if isinstance(raw_item, dict):

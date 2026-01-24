@@ -1,14 +1,23 @@
-speechrecognition
-flask
-werkzeug
-pillow
-pytesseract
-numpy
-opencv-python
-ftfy 
-pyaudio
-googletrans==4.0.0-rc1
-pydub
-transformers
-torch
-sentencepiece
+# Core language & utilities
+python-dateutil>=2.8.2
+
+# Speech-to-Text (Google STT wrapper)
+SpeechRecognition>=3.10.0
+
+# Audio processing
+pydub>=0.25.1
+
+# Deep learning backend
+torch>=2.0.0
+
+# Translation (AI4Bharat IndicTrans2)
+transformers>=4.38.0
+sentencepiece>=0.1.99
+sacremoses>=0.0.53
+
+# Data handling
+numpy>=1.24.0
+
+# Logging & helpers (usually present, but safe)
+tqdm>=4.66.0
+regex>=2023.10.3

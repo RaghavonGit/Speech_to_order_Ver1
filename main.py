@@ -397,9 +397,9 @@ class SpeechToTextGrocerySystem:
                 temp_wav = temp_wav_file.name
                 file_path = temp_wav
             
-            with sr.AudioFile(file_path) as source:
-                audio = self.recognizer.record(source)
-            self.logger.info(f"Processing audio file: {original_file_path}")
+        text_chunk=self.transcribe_with_whisper(chunk_path)
+        if text_chunk:
+            full_transcript.append(text_chunk)
             
             text = None
             for lang_code in ['ta-IN', 'te-IN', 'en-IN']:

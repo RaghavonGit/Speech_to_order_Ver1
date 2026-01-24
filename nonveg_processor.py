@@ -19,6 +19,11 @@ class NonVegProcessor:
         return [s.strip() for s in segments if s.strip()]
 
     def normalize_numbers(self, text: str) -> str:
+        # Protect meat body-part words
+        protected_phrases = ["ஆட்டுக்கால்", "கால் ஆடு", "கால் மட்டன்"]
+        for p in protected_phrases:
+            text = text.replace(p, p.replace("கால்", "__LEG__"))
+
         text = re.sub(r'ஒரு\s+ஆஃப்\s+கே\s*ஜி', '0.5 kg', text)
         text = re.sub(r'ஒரு\s+ஹாஃப்\s+கே\s*ஜி', '0.5 kg', text)
         text = re.sub(r'ஒரு\s+அரை\s+கிலோ', '0.5 kg', text)
@@ -143,6 +148,13 @@ class NonVegProcessor:
             # Default overrides
             if item['name'] in ['Egg', 'Crab', 'Leg', 'Head']:
                 if best_unit == 'kg': best_unit = 'pieces'
+            elif item['name'] == 'Egg':
+                best_unit="tray"
+            # --- FIX: Prevent "கால்" from becoming 0.25 for leg items ---
+            elif item['name'] in ("leg", "goat leg", "mutton leg", "ஆட்டுக்கால்"):
+                best_qty = "1"
+                best_unit = "pieces"
+
             elif item['name'] == 'Mutton' and best_qty == '1':
                 # Custom logic: Default mutton often implies 0.5kg if ambiguous? 
                 # Keeping 1kg for consistency unless specifically handled
