@@ -19,7 +19,8 @@ class VegProcessor:
             "வெங்காயம்": "Onion", "onion": "Onion", "vengayam": "Onion", "big onion": "Onion",
             "சின்ன வெங்காயம்": "Small Onion", "small onion": "Small Onion", "shallots": "Small Onion", 
             "சாம்பார் வெங்காயம்": "Small Onion", "sambar vengayam": "Small Onion", "sambar onion": "Small Onion",
-            "தக்காளி": "Tomato", "tomato": "Tomato", "thakkali": "Tomato",
+            "தக்காளி": "Tomato", "tomato": "Tomato", "thakkali": "Tomato", "thakali": "Tomato",
+
             "உருளைக்கிழங்கு": "Potato", "potato": "Potato", "urulai": "Potato", "urulaikizhangu": "Potato",
             "கேரட்": "Carrot", "carrot": "Carrot",
             "பீன்ஸ்": "Beans", "beans": "Beans",

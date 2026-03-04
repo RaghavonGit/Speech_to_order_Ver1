@@ -60,3 +60,11 @@ static/audio/
 *.wav
 *.mp3
 *.m4a
+
+# Claude Code internal directory
+.claude/
+
+# Runtime-generated text files
+reg_out.txt
+test_line.txt
+system_log.txt
