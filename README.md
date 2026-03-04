@@ -1,45 +1,121 @@
-**Edit a file, create a new file, and clone from Bitbucket in under 2 minutes**
+# Speech-to-Order Ver 1.2
 
-When you're done, you can delete the content in this README and update the file with details for others getting started with your repository.
-
-*We recommend that you open this README in another tab as you perform the tasks below. You can [watch our video](https://youtu.be/0ocf7u76WSo) for a full demo of all the steps in this tutorial. Open the video in a new tab to avoid leaving Bitbucket.*
+A voice-driven grocery ordering system for South Indian languages (Tamil/Telugu). Converts spoken grocery orders — including conversational corrections — into structured item lists with quantities and units.
 
 ---
 
-## Edit a file
+## Features
 
-You’ll start by editing this README file to learn how to edit a file in Bitbucket.
-
-1. Click **Source** on the left side.
-2. Click the README.md link from the list of files.
-3. Click the **Edit** button.
-4. Delete the following text: *Delete this line to make a change to the README from Bitbucket.*
-5. After making your change, click **Commit** and then **Commit** again in the dialog. The commit page will open and you’ll see the change you just made.
-6. Go back to the **Source** page.
-
----
-
-## Create a file
-
-Next, you’ll add a new file to this repository.
-
-1. Click the **New file** button at the top of the **Source** page.
-2. Give the file a filename of **contributors.txt**.
-3. Enter your name in the empty file space.
-4. Click **Commit** and then **Commit** again in the dialog.
-5. Go back to the **Source** page.
-
-Before you move on, go ahead and explore the repository. You've already seen the **Source** page, but check out the **Commits**, **Branches**, and **Settings** pages.
+- **Voice & Text input** — accepts audio files or raw text
+- **Tamil & Telugu support** — handles Tamil script, romanized Tamil, and English
+- **Conversational corrections** — understands multi-step spoken corrections in a single utterance:
+  - Cancel: `சிக்கன் வேண்டாம்` (don't want chicken)
+  - Replace: `அதற்கு பதிலா மட்டன்` (instead of that, mutton)
+  - Update quantity: `தக்காளி 1.5 கிலோ மட்டும்` (just 1.5 kg tomato)
+- **Comma-free voice segmentation** — handles natural speech with no punctuation
+- **Compound fraction support** — `ஒன்னேகால்` → 1.25, `ரெண்டரை` → 2.5, `1/2` → 0.5
+- **Spoken unit variants** — `கிலோ`, `கிராம்`, `டிரே`, `டே` etc.
+- **Translation** — translates Tamil/Telugu input to English using AI4Bharat IndicTrans2
+- **REST API** — Flask server with web UI and client API endpoints
+- **Order persistence** — saves each order as a JSON file
 
 ---
 
-## Clone a repository
+## Project Structure
 
-Use these steps to clone from SourceTree, our client for using the repository command-line free. Cloning allows you to work on your files locally. If you don't yet have SourceTree, [download and install first](https://www.sourcetreeapp.com/). If you prefer to clone from the command line, see [Clone a repository](https://confluence.atlassian.com/x/4whODQ).
+```
+├── app.py                 # Flask API + web interface
+├── grocery_system.py      # Core engine: STT, correction pipeline, cart logic
+├── veg_processor.py       # Vegetable/pantry item extraction
+├── nonveg_processor.py    # Meat item extraction + cooking instructions
+├── tamil_processor.py     # Legacy Tamil helpers
+├── telugu_processor.py    # Legacy Telugu helpers
+├── base_processor.py      # Abstract base class
+├── config.py              # Configuration
+├── test_correction.py     # Correction pipeline tests
+└── orders/                # Saved order JSON files (auto-created)
+```
 
-1. You’ll see the clone button under the **Source** heading. Click that button.
-2. Now click **Check out in SourceTree**. You may need to create a SourceTree account or log in.
-3. When you see the **Clone New** dialog in SourceTree, update the destination path and name if you’d like to and then click **Clone**.
-4. Open the directory you just created to see your repository’s files.
+---
 
-Now that you're more familiar with your Bitbucket repository, go ahead and add a new file locally. You can [push your change back to Bitbucket with SourceTree](https://confluence.atlassian.com/x/iqyBMg), or you can [add, commit,](https://confluence.atlassian.com/x/8QhODQ) and [push from the command line](https://confluence.atlassian.com/x/NQ0zDQ).
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/` | Web interface |
+| `POST` | `/process_text` | Process text input |
+| `POST` | `/process_audio` | Process audio file upload |
+| `GET` | `/health` | Health check |
+| `POST` | `/order/text` | Client API — text order |
+| `POST` | `/order/audio` | Client API — audio order |
+
+### Example Request
+
+```bash
+curl -X POST http://localhost:5000/process_text \
+  -H "Content-Type: application/json" \
+  -d '{"text": "ரெண்டு கிலோ தக்காளி ஒரு கிலோ வெங்காயம்"}'
+```
+
+### Example Response
+
+```json
+{
+  "order_id": "ORDER_1234567890",
+  "language_detected": "tamil",
+  "items": [
+    { "name": "Tomato", "quantity": "2", "unit": "kg", "instructions": [] },
+    { "name": "Onion",  "quantity": "1", "unit": "kg", "instructions": [] }
+  ],
+  "confidence": 0.875
+}
+```
+
+---
+
+## Setup
+
+### Requirements
+
+- Python 3.8+
+- FFmpeg (for audio conversion)
+
+### Install Dependencies
+
+```bash
+pip install flask torch transformers speechrecognition pydub
+```
+
+### Run
+
+```bash
+python app.py
+```
+
+Server starts at `http://0.0.0.0:5000`.
+
+> **Windows note:** Tamil Unicode in the terminal requires `PYTHONIOENCODING=utf-8`.
+
+---
+
+## Translation Model
+
+Uses [AI4Bharat IndicTrans2](https://huggingface.co/ai4bharat/indictrans2-indic-en-dist-200M) (`indictrans2-indic-en-dist-200M`) for Tamil/Telugu → English translation. Downloaded automatically on first run. Falls back to raw text if the model is unavailable.
+
+---
+
+## Supported Languages
+
+| Language | Script | Romanized | STT Code |
+|----------|--------|-----------|----------|
+| Tamil | ✅ | ✅ | `ta-IN` |
+| Telugu | ✅ | — | `te-IN` |
+| English | — | ✅ | `en-IN` (fallback) |
+
+---
+
+## Running Tests
+
+```bash
+python test_correction.py
+```
