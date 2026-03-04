@@ -328,22 +328,22 @@ class SpeechToTextGrocerySystem:
     def _extract_qty_from_segment(self, segment: str):
         """Extract (qty, unit) from a text segment. Returns ('1', '') if nothing found."""
         unit_map = {
-            'kg': 'kg', 'kilogram': 'kg', 'kilo': 'kg', '\u0b95\u0bbf\u0bb2\u0bcb': 'kg',
-            'gram': 'g', 'g': 'g', 'gm': 'g', '\u0b95\u0bbf\u0bb0\u0bbe\u0bae\u0bcd': 'g',
+            'kg': 'kg', 'kilogram': 'kg', 'kilo': 'kg', 'கிலோ': 'kg',
+            'gram': 'g', 'g': 'g', 'gm': 'g', 'கிராம்': 'g',
             'liter': 'liter', 'litre': 'liter', 'l': 'liter',
             'ml': 'ml',
             'packet': 'packets', 'packets': 'packets', 'pkt': 'packets',
             'piece': 'pieces', 'pieces': 'pieces', 'pcs': 'pieces',
-            '\u0baa\u0bc0ஸ்': 'pieces',  # பீஸ் Tamil for pieces
+            'பீஸ்': 'pieces',
             'bunch': 'bunch', 'bunches': 'bunch',
-            'tray': 'tray', '\u0b9f\u0bcd\u0bb0\u0bc7': 'tray',
+            'tray': 'tray', 'ட்ரே': 'tray', 'டிரே': 'tray', 'டே': 'tray',
             'dozen': 'dozen',
         }
         qty_re = (
             r'(\d+(?:\.\d+)?)\s*'
             r'(kg|kilogram|kilo|gram|g|gm|liter|litre|l|ml|'
             r'packet|packets|pkt|piece|pieces|pcs|bunch|bunches|tray|dozen|'
-            r'\u0b95\u0bbf\u0bb2\u0bcb|\u0b95\u0bbf\u0bb0\u0bbe\u0bae\u0bcd|\u0b9f\u0bcd\u0bb0\u0bc7|\u0baa\u0bc0\u0bb8\u0bcd)'
+            r'கிலோ|கிராம்|ட்ரே|பீஸ்|டிரே|டே)'
         )
         norm = self.processors['tamil']['veg'].normalize_numbers(
             self.processors['tamil']['nonveg'].normalize_numbers(segment)
@@ -359,6 +359,62 @@ class SpeechToTextGrocerySystem:
         if not items:
             items = self.processors['tamil']['nonveg'].extract_grocery_items(segment)
         return items[0] if items else None
+
+    def split_on_item_boundaries(self, text: str, from_item_start: bool = False) -> list:
+        """
+        Split comma-free voice text into segments using item name positions as boundaries.
+
+        from_item_start=False: segment starts at previous item's end
+            (initial block — captures leading quantities like "0.5 கிலோ தக்காளி")
+        from_item_start=True: segment starts at current item's start
+            (correction block — avoids trailing cancel signals bleeding in)
+        """
+        # 1. Normalize text
+        norm = self.processors['tamil']['veg'].normalize_numbers(
+            self.processors['tamil']['nonveg'].normalize_numbers(text)
+        )
+
+        # 2. Build combined vocab (veg keys + meat keys)
+        all_vocab = {}
+        all_vocab.update(self.processors['tamil']['veg'].vocab)
+        all_vocab.update(self.processors['tamil']['nonveg'].meat_vocab)
+
+        # 3. Find all item name positions
+        found = []
+        for key in all_vocab:
+            for m in re.finditer(re.escape(key), norm):
+                found.append(m)
+
+        # 4. Deduplicate overlapping matches (longer match wins)
+        found.sort(key=lambda m: len(m.group()), reverse=True)
+        covered = set()
+        unique_matches = []
+        for m in found:
+            indices = set(range(m.start(), m.end()))
+            if not indices.intersection(covered):
+                unique_matches.append(m)
+                covered.update(indices)
+
+        # 5. Sort surviving matches by position
+        unique_matches.sort(key=lambda m: m.start())
+
+        # 6. If 0 or 1 items found, fall through to existing behavior
+        if len(unique_matches) <= 1:
+            return [text]
+
+        # 7. Build segments
+        segments = []
+        for i, item in enumerate(unique_matches):
+            if from_item_start:
+                seg_start = item.start() if i > 0 else 0
+            else:
+                seg_start = unique_matches[i - 1].end() if i > 0 else 0
+            seg_end = unique_matches[i + 1].start() if i < len(unique_matches) - 1 else len(norm)
+            segment = norm[seg_start:seg_end].strip()
+            if segment:
+                segments.append(segment)
+
+        return segments
 
     def _process_complex_order(self, text: str) -> 'OrderResult':
         """
@@ -383,8 +439,10 @@ class SpeechToTextGrocerySystem:
         if len(parts) == 2:
             initial_block, correction_block = parts[0].strip(), parts[1].strip()
         else:
-            # No ellipsis: scan comma-segments to find the first one with a cancel/replace signal
-            all_segs = [s.strip() for s in re.split(r'[,;]', text) if s.strip()]
+            # No ellipsis: scan item-boundary segments to find the first one with a cancel/replace signal
+            all_segs = self.split_on_item_boundaries(text)
+            if not all_segs:
+                all_segs = [text]
             split_at = None
             for idx, seg in enumerate(all_segs):
                 if re.search(self.CANCEL_SIGNAL + '|' + self.REPLACE_SIGNAL, seg, re.IGNORECASE):
@@ -406,7 +464,9 @@ class SpeechToTextGrocerySystem:
         # Split initial block on commas and extract items from each segment independently.
         # This ensures instructions like 'cleaned' for Fish don't spill into Mutton via
         # the proximity window when they're in the same sentence.
-        initial_segs = [s.strip() for s in re.split(r'[,;]', initial_block) if s.strip()]
+        initial_segs = self.split_on_item_boundaries(initial_block, from_item_start=False)
+        if not initial_segs and initial_block.strip():
+            initial_segs = [initial_block]
         raw_cart: list = []
         for seg in initial_segs:
             seg_items = (self.processors['tamil']['veg'].extract_grocery_items(seg) +
@@ -416,7 +476,7 @@ class SpeechToTextGrocerySystem:
             # on the full segment and merge any that were missed.
             full_seg_instrs = self.processors['tamil']['nonveg'].extract_instructions(seg)
             for item in seg_items:
-                if full_seg_instrs and not item.get('instructions'):
+                if full_seg_instrs and not item.get('instructions') and item.get('name') != 'Egg':
                     item['instructions'] = full_seg_instrs
             raw_cart.extend(seg_items)
 
@@ -431,8 +491,9 @@ class SpeechToTextGrocerySystem:
 
         # ── 3. Parse correction segments ────────────────────────────────────
         if correction_block:
-            # Split on , or ; — but NOT on . between digits (preserves decimals like 1.5)
-            segs = [s.strip() for s in re.split(r'[,\uff0c;]|(?<!\d)\.(?!\d)', correction_block) if s.strip()]
+            segs = self.split_on_item_boundaries(correction_block, from_item_start=True)
+            if not segs and correction_block.strip():
+                segs = [correction_block]
 
             i = 0
 
@@ -630,6 +691,11 @@ class SpeechToTextGrocerySystem:
         segments = [clean_text]
         if hasattr(self.processors['tamil']['veg'], 'segment_text'):
             segments = self.processors['tamil']['veg'].segment_text(clean_text)
+        # Fallback: if comma-split produced only 1 long segment, use smart boundary split
+        if len(segments) == 1 and len(clean_text) > 30:
+            smart = self.split_on_item_boundaries(clean_text)
+            if len(smart) > 1:
+                segments = smart
 
         all_extracted_items = []
 

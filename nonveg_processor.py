@@ -13,6 +13,20 @@ class NonVegProcessor:
             "cleaned": [ r"சுத்தம்", r"clean" ],
             "head removed": [ r"தலை\s*இல்ல", r"head\s*remove", r"headless" ],
         }
+        self.meat_vocab = {
+            "சிக்கன்": "Chicken", "chicken": "Chicken", "கோழி": "Chicken",
+            "மட்டன்": "Mutton", "mutton": "Mutton", "ஆடு": "Mutton",
+            "மீன்": "Fish", "fish": "Fish",
+            "இறால்": "Prawn", "prawn": "Prawn",
+            "நண்டு": "Crab", "crab": "Crab",
+            "முட்டை": "Egg", "முட்ட": "Egg", "egg": "Egg",
+            "brain": "Brain",
+            "பிரைன்": "Brain",
+            "leg": "Leg",
+            "கால்": "Leg",
+            "liver": "Liver",
+            "ஈரல்": "Liver"
+        }
 
     def segment_text(self, text: str):
         segments = re.split(r'[,;]|\s+and\s+|\s+mattrum\s+', text)
@@ -27,6 +41,24 @@ class NonVegProcessor:
         text = re.sub(r'ஒரு\s+ஆஃப்\s+கே\s*ஜி', '0.5 kg', text)
         text = re.sub(r'ஒரு\s+ஹாஃப்\s+கே\s*ஜி', '0.5 kg', text)
         text = re.sub(r'ஒரு\s+அரை\s+கிலோ', '0.5 kg', text)
+
+        # Slash fractions from STT output
+        text = re.sub(r'\b1/2\b', '0.5', text)
+        text = re.sub(r'\b1/4\b', '0.25', text)
+        text = re.sub(r'\b3/4\b', '0.75', text)
+
+        # Compound Tamil fraction words (single Unicode tokens)
+        text = text.replace('ஒன்னேகால்',     '1.25')
+        text = text.replace('ஒன்னரை',        '1.5')
+        text = text.replace('ஒன்னேரை',       '1.5')
+        text = text.replace('ஒன்னேமுக்கால்', '1.75')
+        text = text.replace('ரெண்டரை',       '2.5')
+        text = text.replace('ரெண்டேரை',      '2.5')
+        text = text.replace('மூணரை',         '3.5')
+        text = text.replace('மூணேரை',        '3.5')
+        text = text.replace('நாலரை',         '4.5')
+        text = text.replace('அஞ்சரை',        '5.5')
+
         number_map = {
             "ondru": "1", "onnu": "1", "oru": "1", "one": "1", "ஒரு": "1", "ஒன்னு": "1",
             "rendu": "2", "two": "2", "irandu": "2", "ரெண்டு": "2", "இரண்டு": "2",
@@ -59,17 +91,15 @@ class NonVegProcessor:
 
 
         unit_map = {
-            "kg": "kg", "kilogram": "kg", "kilo": "kg", "கிலோ": "kg","கே ஜி": "kg",
+            "kg": "kg", "kilogram": "kg", "kilo": "kg", "கிலோ": "kg", "கே ஜி": "kg",
             "gram": "g", "g": "g", "gm": "g", "கிராம்": "g",
-            "piece": "pieces", "pieces": "pieces", "pcs": "pieces", "பீஸ்": "pieces","tray": "tray",
-            "trays": "tray",
-            "ட்ரே": "tray",
-            "ட்ரேய்": "tray"
-
+            "piece": "pieces", "pieces": "pieces", "pcs": "pieces", "பீஸ்": "pieces",
+            "tray": "tray", "trays": "tray",
+            "ட்ரே": "tray", "ட்ரேய்": "tray", "டிரே": "tray", "டே": "tray",
         }
 
         # 1. FIND QUANTITIES
-        qty_pattern = r'(\d+(?:\.\d+)?)\s*(kg|kilogram|kilo|gram|g|gm|piece|pieces|pcs|tray|trays|ட்ரே|ட்\s*ரே|ட்ரேய்|ட\s*ரே)'
+        qty_pattern = r'(\d+(?:\.\d+)?)\s*(kg|kilogram|kilo|gram|g|gm|piece|pieces|pcs|tray|trays|ட்ரே|ட்\s*ரே|ட்ரேய்|ட\s*ரே|கிலோ|கிராம்|டிரே|டே)'
         quantities = []
         for m in re.finditer(qty_pattern, text):
             raw_unit = m.group(2)
@@ -81,21 +111,7 @@ class NonVegProcessor:
             })
             
         # 2. FIND MEAT ITEMS
-        meat_vocab = {
-            "சிக்கன்": "Chicken", "chicken": "Chicken", "கோழி": "Chicken",
-            "மட்டன்": "Mutton", "mutton": "Mutton", "ஆடு": "Mutton",
-            "மீன்": "Fish", "fish": "Fish",
-            "இறால்": "Prawn", "prawn": "Prawn",
-            "நண்டு": "Crab", "crab": "Crab",
-            "முட்டை": "Egg", "egg": "Egg",
-            "brain": "Brain",
-            "பிரைன்": "Brain",
-            "leg": "Leg",
-            "கால்": "Leg",    
-            "liver": "Liver",
-            "ஈரல்": "Liver"
-
-        }
+        meat_vocab = self.meat_vocab
         
         found_items = []
         for local, name in meat_vocab.items():
@@ -122,7 +138,8 @@ class NonVegProcessor:
         results = []
         for item in final_items_list:
             window = text[max(0, item['start']-20):item['end']+20]
-            instructions = self.extract_instructions(window)
+            # Egg cannot have meat-cutting instructions (boneless/biryani cut etc.)
+            instructions = [] if item['name'] == 'Egg' else self.extract_instructions(window)
             best_qty = "1"
             best_unit = ""
             if best_unit == "tray" and not best_qty:

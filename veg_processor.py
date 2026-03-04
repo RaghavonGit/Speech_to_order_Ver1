@@ -113,6 +113,23 @@ class VegProcessor:
         return [s.strip() for s in segments if s.strip()]
 
     def normalize_numbers(self, text: str) -> str:
+        # Slash fractions from STT output
+        text = re.sub(r'\b1/2\b', '0.5', text)
+        text = re.sub(r'\b1/4\b', '0.25', text)
+        text = re.sub(r'\b3/4\b', '0.75', text)
+
+        # Compound Tamil fraction words (single Unicode tokens)
+        text = text.replace('ஒன்னேகால்',     '1.25')
+        text = text.replace('ஒன்னரை',        '1.5')
+        text = text.replace('ஒன்னேரை',       '1.5')
+        text = text.replace('ஒன்னேமுக்கால்', '1.75')
+        text = text.replace('ரெண்டரை',       '2.5')
+        text = text.replace('ரெண்டேரை',      '2.5')
+        text = text.replace('மூணரை',         '3.5')
+        text = text.replace('மூணேரை',        '3.5')
+        text = text.replace('நாலரை',         '4.5')
+        text = text.replace('அஞ்சரை',        '5.5')
+
         number_map = {
             "ondru": "1", "onnu": "1", "oru": "1", "one": "1", "ஒரு": "1", "ஒன்னு": "1",
             "rendu": "2", "two": "2", "irandu": "2", "ரெண்டு": "2", "இரண்டு": "2",
@@ -146,12 +163,12 @@ class VegProcessor:
             "packet": "packets", "packets": "packets", "pkt": "packets", "பாக்கெட்": "packets",
             "piece": "pieces", "pieces": "pieces", "pcs": "pieces", "பீஸ்": "pieces",
             "bunch": "bunch", "bunches": "bunch", "kattu": "bunch", "கட்டு": "bunch",
-            "tray": "tray", "ட்ரே": "tray",
+            "tray": "tray", "ட்ரே": "tray", "டிரே": "tray", "டே": "tray",
             "dozen": "dozen", "டஜன்": "dozen"
         }
 
         # 1. FIND ALL QUANTITIES (with positions)
-        qty_pattern = r'(\d+(?:\.\d+)?)\s*(kg|kilogram|kilo|gram|g|gm|liter|litre|l|ml|milli|packet|packets|pkt|piece|pieces|pcs|bunch|bunches|kattu|dozen|tray|கிலோ|லிட்டர்|கிராம்|பாக்கெட்|பீஸ்|கட்டு|டஜன்|ட்ரே)'
+        qty_pattern = r'(\d+(?:\.\d+)?)\s*(kg|kilogram|kilo|gram|g|gm|liter|litre|l|ml|milli|packet|packets|pkt|piece|pieces|pcs|bunch|bunches|kattu|dozen|tray|கிலோ|லிட்டர்|கிராம்|பாக்கெட்|பீஸ்|கட்டு|டஜன்|ட்ரே|டிரே|டே)'
         
         quantities = []
         for m in re.finditer(qty_pattern, text):
